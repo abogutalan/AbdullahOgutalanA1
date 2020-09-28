@@ -180,14 +180,6 @@ int main(void)
 		{				   // this is the child process
 			close(sockfd); // child doesn't need the listener
 
-<<<<<<< HEAD
-			
-
-			if (send(new_fd, "Hello, world!", 13, 0) == -1)
-				perror("send");
-			close(new_fd);
-			exit(0);
-=======
 			// file read
 			char *content;
 			content = readFileContent("test.txt");
@@ -205,7 +197,6 @@ int main(void)
 				exit(0);
 			}
 
->>>>>>> 8f5f62c7fc0bcdc5f769854f2d2e1dffb3d51c62
 		}
 		close(new_fd); // parent doesn't need this
 	}

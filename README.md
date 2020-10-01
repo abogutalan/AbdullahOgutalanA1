@@ -1,3 +1,8 @@
+Beej’s Guide to Network Programming is Copyright © 2019 Brian “Beej Jorgensen” Hall.
+
+
+
+
 > ./server
 
 > ./client server-IP-address filename

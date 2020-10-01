@@ -15,6 +15,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+#define MAXDATASIZE 100 // max number of bytes we can get at once
+
 #define PORT "29732" // the port users will be connecting to
 
 #define BACKLOG 10 // how many pending connections queue will hold
@@ -89,7 +91,7 @@ char *readFileContent(const char *const filename)
 
 int main(void)
 {
-	int sockfd, new_fd; // listen on sock_fd, new connection on new_fd
+	int sockfd, new_fd, numbytes; // listen on sock_fd, new connection on new_fd
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
@@ -97,6 +99,8 @@ int main(void)
 	int yes = 1;
 	char s[INET6_ADDRSTRLEN];
 	int rv;
+
+	char buf[MAXDATASIZE];
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -180,26 +184,34 @@ int main(void)
 		{				   // this is the child process
 			close(sockfd); // child doesn't need the listener
 
-			// file read
-			char *content;
-			content = readFileContent("test.txt");
-			if (content != NULL)
-			{
-				printf("%s\n", content);
+			// // file read
+			// char *content;
+			// content = readFileContent("test.txt");
+			// if (content != NULL)
+			// {
+			// 	printf("%s\n", content);
 
-				// getting file size of the txt file
-				int length = strlen(content);
-				printf("length of the file: %d", length);
-				if (send(new_fd, content, length, 0) == -1)
-					perror("send");
-				free(content);
-				close(new_fd);
-				exit(0);
+			// 	// getting file size of the txt file
+			// 	int length = strlen(content);
+			// 	printf("length of the file: %d\n", length);
+			if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)
+			{
+				perror("recv");
+				exit(1);
 			}
 
-		}
-		close(new_fd); // parent doesn't need this
-	}
+			buf[numbytes] = '\0';
 
-	return 0;
+			printf("client: received '%s'\n", buf);
+
+			close(sockfd);
+
+			return 0;
+		// }
+	}
+	close(new_fd); // parent doesn't need this
+
+}
+
+return 0;
 }

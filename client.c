@@ -16,7 +16,7 @@
 
 #define PORT "29732" // the port client will be connecting to
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#define MAXDATASIZE 4096 // max number of bytes we can get at once
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -29,50 +29,6 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-// https://stackoverflow.com/questions/28677004/how-to-assign-text-file-data-to-variable
-char *readFileContent(const char *const filename)
-{
-	size_t size;
-	FILE *file;
-	char *data;
-
-	file = fopen(filename, "r");
-	if (file == NULL)
-	{
-		perror("fopen()\n");
-		return NULL;
-	}
-
-	/* get the file size by seeking to the end and getting the position */
-	fseek(file, 0L, SEEK_END);
-	size = ftell(file);
-	/* reset the file position to the begining. */
-	rewind(file);
-
-	/* allocate space to hold the file content */
-	data = malloc(1 + size);
-	if (data == NULL)
-	{
-		perror("malloc()\n");
-		fclose(file);
-		return NULL;
-	}
-	/* nul terminate the content to make it a valid string */
-	data[size] = '\0';
-	/* attempt to read all the data */
-	if (fread(data, 1, size, file) != size)
-	{
-		perror("fread()\n");
-
-		free(data);
-		fclose(file);
-
-		return NULL;
-	}
-	fclose(file);
-	return data;
-}
-
 int main(int argc, char *argv[])
 {
 	int sockfd, numbytes;
@@ -81,13 +37,24 @@ int main(int argc, char *argv[])
 	int rv;
 	char s[INET6_ADDRSTRLEN];
 
+	char filename[500];
+	FILE *fp;
+	int currLocation = 0;
+	char character = '?';
+	int length = 0;
+	unsigned long fileSize = 0;
+	unsigned long currSend = 0;
+	int mysend = 0;
+
+
 	printf("argc: %d\n", argc);
 
-	if (argc != 2)
+	if (argc < 3)
 	{
-		fprintf(stderr, "usage: client hostname\n");
+		fprintf(stderr, "Please enter valid inputs (Ex> ./client server-IP-address filename )\n");
 		exit(1);
 	}
+	strcpy(filename, argv[2]);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -132,22 +99,39 @@ int main(int argc, char *argv[])
 	freeaddrinfo(servinfo); // all done with this structure
 
 	// *********************************
-	char *content;
-	content = readFileContent("test.txt");
-	if (content != NULL)
-	{
-		printf("CLIENT-%s\n", content);
-
-		// getting file size of the txt file
-		int length = strlen(content);
-		printf("CLIENT-length of the file: %d\n", length);
-		if (send(sockfd, content, length, 0) == -1)
-			perror("send");
-		free(content);
-		close(sockfd);
-		exit(0);
+	char* bufferToServer = (char*)malloc(sizeof(char) * (MAXDATASIZE + 1));
+	if(bufferToServer == NULL){
+		fprintf(stderr, "bufferToServer is NULL!\n");
+		exit(1);
 	}
-	// *********************************
+	strcpy(bufferToServer,"");
 
+	// Read from file
+	fp = fopen(filename,"r");
+	if(fp == NULL){
+		fprintf(stderr, "The file is NULL!\n");
+	}
+
+	do {
+		// Send packets to server
+		while( currLocation < MAXDATASIZE && (character = fgetc(fp)) != EOF){
+			bufferToServer[currLocation] = character;
+			currLocation = currLocation + 1;
+		}
+		bufferToServer[currLocation] = '\0';
+		length  = strlen(bufferToServer);
+
+		while((mysend = send(sockfd, bufferToServer, length, 0)) <= 0);
+		// mysend = send(sockfd, bufferToServer, length, 0);
+		printf("mysend Val :: %d\n", mysend);
+
+		currSend = currSend + currLocation;
+		currLocation = 0;
+		strcpy(bufferToServer, "");
+	} while(currSend < fileSize);
+	fclose(fp);
+	free(bufferToServer);
+	close(sockfd);
+	exit(0);
 	
 }

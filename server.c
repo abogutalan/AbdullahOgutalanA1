@@ -15,7 +15,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#define MAXDATASIZE 4096 // max number of bytes we can get at once
 
 #define PORT "29732" // the port users will be connecting to
 
@@ -45,49 +45,6 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-// https://stackoverflow.com/questions/28677004/how-to-assign-text-file-data-to-variable
-char *readFileContent(const char *const filename)
-{
-	size_t size;
-	FILE *file;
-	char *data;
-
-	file = fopen(filename, "r");
-	if (file == NULL)
-	{
-		perror("fopen()\n");
-		return NULL;
-	}
-
-	/* get the file size by seeking to the end and getting the position */
-	fseek(file, 0L, SEEK_END);
-	size = ftell(file);
-	/* reset the file position to the begining. */
-	rewind(file);
-
-	/* allocate space to hold the file content */
-	data = malloc(1 + size);
-	if (data == NULL)
-	{
-		perror("malloc()\n");
-		fclose(file);
-		return NULL;
-	}
-	/* nul terminate the content to make it a valid string */
-	data[size] = '\0';
-	/* attempt to read all the data */
-	if (fread(data, 1, size, file) != size)
-	{
-		perror("fread()\n");
-
-		free(data);
-		fclose(file);
-
-		return NULL;
-	}
-	fclose(file);
-	return data;
-}
 
 int main(void)
 {
@@ -99,6 +56,9 @@ int main(void)
 	int yes = 1;
 	char s[INET6_ADDRSTRLEN];
 	int rv;
+
+	int len;
+	int retryCount = 0;
 
 	char buf[MAXDATASIZE];
 
@@ -180,31 +140,24 @@ int main(void)
 				  s, sizeof s);
 		printf("server: got connection from %s\n", s);
 
+
 		if (!fork())
 		{				   // this is the child process
 			close(sockfd); // child doesn't need the listener
 
-			// // file read
-			// char *content;
-			// content = readFileContent("test.txt");
-			// if (content != NULL)
-			// {
-			// 	printf("%s\n", content);
+			
 
-			// 	// getting file size of the txt file
-			// 	int length = strlen(content);
-			// 	printf("length of the file: %d\n", length);
-			if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)
-			{
-				perror("recv");
-				exit(1);
-			}
+			retryCount = -1;
+			do {
+			while((len = recv(new_fd, buf, MAXDATASIZE, 0)) <= 0);
+			buf[len] = '\0';
+			retryCount++;
+			}while (retryCount < BACKLOG && len <= 0);
 
-			buf[numbytes] = '\0';
 
 			printf("client: received '%s'\n", buf);
 
-			close(sockfd);
+			close(new_fd);
 
 			return 0;
 		// }
